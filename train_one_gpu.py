@@ -17,10 +17,27 @@ from dataloader import build_dataloader
 from model import MultiTaskModel
 from utils import length_to_mask, scan_checkpoint
 
+config_path = "Configs/config.yml" # you can change it to anything else
+config = yaml.safe_load(open(config_path))
+
+with open(config['dataset_params']['token_maps'], 'rb') as handle:
+    token_maps = pickle.load(handle)
+tokenizer = BertJapaneseTokenizer.from_pretrained(config['dataset_params']['tokenizer'])
+
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+criterion = nn.CrossEntropyLoss().to(device)
 
+best_loss = float('inf')  # best test loss
+start_epoch = 0  # start from epoch 0 or last checkpoint epoch
+loss_train_record = list([])
+loss_test_record = list([])
 
+num_steps = config['num_steps']
+log_interval = config['log_interval']
+save_interval = config['save_interval']
+    
 def train():
+
     curr_steps = 0
     
     dataset = load_from_disk(config["data_folder"])
@@ -70,6 +87,7 @@ def train():
     
     if load:
         checkpoint = torch.load(os.path.join(log_dir, "{}.pth.tar".format(iters)))
+
         bert.load_state_dict(checkpoint['model'], strict=False)
         optimizer.load_state_dict(checkpoint['optimizer'])
 
@@ -77,7 +95,7 @@ def train():
     bert.train()
 
     running_loss = 0
-    epoch = 0
+    epoch = start_epoch
     while True:
         for _, batch in enumerate(train_loader):
             curr_steps += 1
@@ -88,6 +106,19 @@ def train():
             
             tokens_pred, words_pred = bert(phonemes, attention_mask=(~text_mask).int())
             
+            sample_idx = 5
+            print("input_lengths", input_lengths[sample_idx])
+            print("labels", labels.size())
+            print("labels", tokenizer.decode(labels[sample_idx][:input_lengths[sample_idx]].tolist()))
+            print("phonemes_size", phonemes.size())
+            print("phonemes", tokenizer.decode(phonemes[sample_idx][:input_lengths[sample_idx]].tolist()))
+            print("tokens_pred_size", tokens_pred.size())
+            print("tokens_pred", tokenizer.decode(tokens_pred[sample_idx][:input_lengths[sample_idx]].argmax(dim=-1).tolist()))
+            print("words_size", words.size())
+            print("words", tokenizer.decode(words[sample_idx][:input_lengths[sample_idx]].tolist()))
+            print("words_pred_size", words_pred.size())
+            print("words_pred", tokenizer.decode(words_pred[sample_idx][:input_lengths[sample_idx]].argmax(dim=-1).tolist()))
+
             loss_vocab = 0
             for _s2s_pred, _text_input, _text_length, _masked_indices in zip(words_pred, words, input_lengths, masked_indices):
                 loss_vocab += criterion(_s2s_pred[:_text_length], 
@@ -139,25 +170,6 @@ def train():
         epoch += 1
         print(f"epoch: {epoch}")
 
-
-if __name__ == '__main__':
-    config_path = "Configs/config.yml" # you can change it to anything else
-    config = yaml.safe_load(open(config_path))
-
-    with open(config['dataset_params']['token_maps'], 'rb') as handle:
-        token_maps = pickle.load(handle)
-
-    tokenizer = BertJapaneseTokenizer.from_pretrained(config['dataset_params']['tokenizer'])
-
-    criterion = nn.CrossEntropyLoss().to(device)
-
-    best_loss = float('inf')  # best test loss
-    start_epoch = 0  # start from epoch 0 or last checkpoint epoch
-    loss_train_record = list([])
-    loss_test_record = list([])
-
-    num_steps = config['num_steps']
-    log_interval = config['log_interval']
-    save_interval = config['save_interval']
-
-    train()
+# Set the specific GPU(s) to use (e.g., use GPU 1)
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+train()

@@ -1,0 +1,13 @@
+pyopenjtalk
+fugashi[unidic-lite]
+ipadic
+# tensorboard
+# pandas
+# singleton-decorator
+datasets
+transformers<4.33.3
+# accelerate
+# nltk
+# phonemizer
+# sacremoses
+pebble

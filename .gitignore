@@ -165,3 +165,5 @@ Checkpoint*/
 logs*/
 token_maps.pkl
 token_maps.txt
+**/processed_data
+*.zip
